@@ -133,6 +133,75 @@ export class ResumeService implements OnModuleInit {
   }
 
   /**
+   * Search from all resumes based on a general query.
+   * @param query
+   * @returns
+   */
+  async searchAllResumes(query: string): Promise<any[]> {
+    const allResumes = await this.resumeModel.find().exec();
+    const results: {
+      id: string;
+      fileName: string;
+      answer: string;
+      matchesCriteria: boolean;
+    }[] = [];
+
+    if (!this.llm) {
+      throw new InternalServerErrorException(
+        'LLM not initialized. Check API key configuration.',
+      );
+    }
+
+    for (const resume of allResumes) {
+      const resumeContent = resume.extractedText;
+      const specificQuestion = `Based on the following resume, ${query}. If yes, state their name and relevant experience. If no, just state 'No match'.`;
+
+      // Craft a prompt to help Gemini extract specific info and directly answer a boolean question
+      const promptMessages = [
+        new SystemMessage(
+          `You are an AI assistant specialized in analyzing resumes.
+          Answer the user's question based *only* on the provided resume content.
+          If the resume contains the information required to answer the question positively, state the candidate's name (if available) and the specific detail (e.g., "John Doe has 5 years of experience").
+          If the resume does not contain the information or if the criteria is not met, respond only with "No match".
+          Resume Content:
+          ---
+          ${resumeContent}
+          ---`,
+        ),
+        new HumanMessage(specificQuestion),
+      ];
+
+      try {
+        const response = await this.llm.invoke(promptMessages);
+        const answer = response.content.toString().trim();
+
+        // Simple parsing: if it doesn't contain "No match", assume it's a match.
+        // For more complex queries, you might need more sophisticated NLP parsing
+        // or a structured output from the LLM (e.g., JSON).
+        const matchesCriteria = !answer.includes('No match');
+
+        results.push({
+          id: resume._id.toString(),
+          fileName: resume.originalFileName,
+          answer: answer,
+          matchesCriteria: matchesCriteria,
+        });
+      } catch (error) {
+        console.error(`Error querying resume ${resume._id} for search:`, error);
+        results.push({
+          id: resume._id.toString(),
+          fileName: resume.originalFileName,
+          answer: 'Error processing this resume.',
+          matchesCriteria: false,
+        });
+      }
+    }
+
+    // Filter to only include resumes that matched the criteria
+    return results.filter((res) => res.matchesCriteria);
+  }
+
+  /**
    * Retrieves a resume document by its ID.
    * @param id
    * @returns

@@ -16,6 +16,7 @@ import {
 import { ResumeService } from './resume.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AskQuestionDto } from './dto/ask-question.dto';
+import { SearchQueryDto } from './dto/search-query.dto';
 
 @Controller('resume')
 export class ResumeController {
@@ -57,13 +58,23 @@ export class ResumeController {
   }
 
   /**
+   * API for search from all resumes based on a general query.
+   * @param searchQueryDto
+   * @returns
+   */
+  @Post('search')
+  async searchResumes(@Body() searchQueryDto: SearchQueryDto) {
+    return this.resumeService.searchAllResumes(searchQueryDto.query);
+  }
+
+  /**
    * API for get details of a specific resume by ID.
    * @param id
    * @returns
    */
   @Get(':id')
   async getResume(@Param('id') id: string) {
-    return await this.resumeService.getResumeById(id);
+    return this.resumeService.getResumeById(id);
   }
 
   /**
