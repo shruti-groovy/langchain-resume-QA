@@ -33,8 +33,13 @@ export class ResumeController {
     @UploadedFile(
       new ParseFilePipe({
         validators: [
-          new MaxFileSizeValidator({ maxSize: 1024 * 1024 * 5 }), // Max 5MB
-          new FileTypeValidator({ fileType: 'application/pdf' }), // Only PDF files
+          new MaxFileSizeValidator({
+            maxSize: 1024 * 1024 * 5,
+            message: 'File size should not exceed 5MB',
+          }), // Max 5MB
+          new FileTypeValidator({
+            fileType: 'application/pdf',
+          }), // Only PDF files
         ],
         errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
       }),

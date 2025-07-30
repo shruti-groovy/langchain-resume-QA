@@ -139,12 +139,6 @@ export class ResumeService implements OnModuleInit {
    */
   async searchAllResumes(query: string): Promise<any[]> {
     const allResumes = await this.resumeModel.find().exec();
-    const results: {
-      id: string;
-      fileName: string;
-      answer: string;
-      matchesCriteria: boolean;
-    }[] = [];
 
     if (!this.llm) {
       throw new InternalServerErrorException(
@@ -152,7 +146,7 @@ export class ResumeService implements OnModuleInit {
       );
     }
 
-    for (const resume of allResumes) {
+    const tasks = allResumes.map(async (resume) => {
       const resumeContent = resume.extractedText;
       const specificQuestion = `Based on the following resume, ${query}. If yes, state their name and relevant experience. If no, just state 'No match'.`;
 
@@ -174,28 +168,25 @@ export class ResumeService implements OnModuleInit {
       try {
         const response = await this.llm.invoke(promptMessages);
         const answer = response.content.toString().trim();
-
-        // Simple parsing: if it doesn't contain "No match", assume it's a match.
-        // For more complex queries, you might need more sophisticated NLP parsing
-        // or a structured output from the LLM (e.g., JSON).
         const matchesCriteria = !answer.includes('No match');
 
-        results.push({
+        return {
           id: resume._id.toString(),
           fileName: resume.originalFileName,
           answer: answer,
           matchesCriteria: matchesCriteria,
-        });
+        };
       } catch (error) {
         console.error(`Error querying resume ${resume._id} for search:`, error);
-        results.push({
+        return {
           id: resume._id.toString(),
           fileName: resume.originalFileName,
           answer: 'Error processing this resume.',
           matchesCriteria: false,
-        });
+        };
       }
-    }
+    });
+    const results = await Promise.all(tasks);
 
     // Filter to only include resumes that matched the criteria
     return results.filter((res) => res.matchesCriteria);
